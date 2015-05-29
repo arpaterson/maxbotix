@@ -1,0 +1,118 @@
+#!/usr/bin/python
+#
+# Author: Anthony Paterson, May 2015, arpaterson.wordpress.com
+
+import os, sys
+import io
+import threading
+import smbus
+import time
+import RPi.GPIO as GPIO
+import struct
+
+os.system('clear')
+
+rangefinder = None # global variable.
+DEVICE_CMD_RANGE_NOW = 0x51
+
+
+class rangeFinder():
+	def __init__(self, bus = 1, deviceaddress = 0x70, intpin = 23, verbose = 0):
+	 self.bus = smbus.SMBus(bus)
+	 self.deviceaddress = deviceaddress
+	 self.intpin = intpin
+
+	 GPIO.setmode( GPIO.BCM)
+	 GPIO.setup( intpin, GPIO.IN, pull_up_down=GPIO.PUD_UP )
+
+	 self.range = -1
+	 self.verbose = verbose
+
+
+	def next(self):
+	 #get new range reading
+	 v1 = [-0,1]
+ 
+	 #wait for status pin to pull port 23 low
+	 try:
+		 #wait for intpin to be ready 
+		 self.bus.write_byte( self.deviceaddress,DEVICE_CMD_RANGE_NOW)
+		 time.sleep( 0.1 ) # give it a chance to start ranging 
+		 #GPIO.wait_for_edge( self.intpin, GPIO.FALLING ) #wait for it to signal ranging finished
+		 #^is causing an error
+		 #time.sleep( 1 )
+		 v1 = self.bus.read_i2c_block_data( self.deviceaddress , 0, 2 )
+		 #^this is not always reading both bytes well.
+		 #v1[0] = self.bus.read_byte(self.deviceaddress)
+		 #time.sleep(0.1)
+		 #v1[1] = self.bus.read_byte(self.deviceaddress)
+	 	 if self.verbose > 0:
+	  	  sys.stderr.write(' highbyte = {0:b} , lowbyte = {1:b},'.format(v1[0], v1[1]) )
+
+	 except KeyboardInterrupt, IOError:
+		 #need some connection monitoring on IOError?
+		 GPIO.cleanup()	#cleanup GPIO on Ctrl-C exit
+		 v1 = [0,0]
+
+	 if (v1[0] != -1) & (v1[1] != -1):
+		 #format highbyte
+		 highbyte = v1[0] #maxbotix sends signed 8bit int high byte
+		 highbyte = highbyte & 0x7f #drop the sign bit
+		 lowbyte = v1[1] #maxbotix sends unsigned 8bit int low byte
+
+
+	 #assemble 16bit value
+	 self.range = (highbyte<<8) + lowbyte
+
+	 #write high and low bytes out to std err for debugging
+	 if self.verbose > 0:
+	  sys.stderr.write(' range = {}\r\n'.format(self.range) )
+
+	 return self.range
+
+class RangeFinderPoller(threading.Thread):
+	def __init__(self):
+	 threading.Thread.__init__(self)
+	 global rangefinder #bring it in scope
+	 rangefinder = rangeFinder(1, 0x70, 23, 0)
+	 self.current_value = None
+	 self.running = True
+
+	def run(self):
+	 global rangefinder
+	 while self.running:
+	  rangefinder.next()
+
+
+if __name__ == "__main__":
+ rfp = RangeFinderPoller()
+ try:
+  unitname = os.uname()[1]
+  starttime = time.strftime("%Y%m%d-%H%M%S")
+  filename = unitname + '_' + starttime + '_log_range.csv'
+  fid = io.open(filename,'w')
+  header = u"utc_seconds, range (cm)\r\n"
+  fid.write(header)
+  rfp.start()
+  while True:
+   #
+   os.system('clear')
+   
+   fid.write(u"{:f}, {}\r\n".format(
+				time.time(),
+				rangefinder.range,
+				))
+
+   print 'time: {}' , time.time()
+   print 'range: {}' , rangefinder.range
+
+   time.sleep(0.1)
+
+ except (KeyboardInterrupt, SystemExit):
+  fid.close()
+  print "\nKilling Thread..."
+  rfp.running = False
+  rfp.join() # wait for the thread to finish what it's doing
+  GPIO.cleanup()
+  exit()
+	
