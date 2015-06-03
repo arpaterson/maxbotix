@@ -9,6 +9,7 @@ import smbus
 import time
 import RPi.GPIO as GPIO
 import struct
+execfile("/home/pi/python/camera/vio/viostream/VioStream.py")
 
 os.system('clear')
 
