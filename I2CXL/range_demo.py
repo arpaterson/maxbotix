@@ -85,6 +85,9 @@ class RangeFinderPoller(threading.Thread):
 
 
 if __name__ == "__main__":
+
+ os.chdir('/var/www/logs')
+
  rfp = RangeFinderPoller()
  try:
   unitname = os.uname()[1]
