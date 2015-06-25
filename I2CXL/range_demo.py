@@ -37,14 +37,14 @@ class rangeFinder():
 	 try:
 		 #wait for intpin to be ready 
 		 self.bus.write_byte( self.deviceaddress,DEVICE_CMD_RANGE_NOW)
-		 time.sleep( 0.1 ) # give it a chance to start ranging 
+		 time.sleep( 0.05 ) # give it a chance to start ranging 
 		 #GPIO.wait_for_edge( self.intpin, GPIO.FALLING ) #wait for it to signal ranging finished
 		 #^is causing an error
 		 #time.sleep( 1 )
 		 v1 = self.bus.read_i2c_block_data( self.deviceaddress , 0, 2 )
 		 #^this is not always reading both bytes well.
 		 #v1[0] = self.bus.read_byte(self.deviceaddress)
-		 #time.sleep(0.1)
+		 time.sleep(0.05)
 		 #v1[1] = self.bus.read_byte(self.deviceaddress)
 	 	 if self.verbose > 0:
 	  	  sys.stderr.write(' highbyte = {0:b} , lowbyte = {1:b},'.format(v1[0], v1[1]) )
