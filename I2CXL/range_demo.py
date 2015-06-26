@@ -48,8 +48,11 @@ class rangeFinder():
 		 #v1[1] = self.bus.read_byte(self.deviceaddress)
 	 	 if self.verbose > 0:
 	  	  sys.stderr.write(' highbyte = {0:b} , lowbyte = {1:b},'.format(v1[0], v1[1]) )
-
-	 except KeyboardInterrupt, IOError:
+	 except IOError as e:
+	         repr( e )
+		 v1 = [0,0]
+	 except KeyboardInterrupt as e:
+		 repr( e )
 		 #need some connection monitoring on IOError?
 		 GPIO.cleanup()	#cleanup GPIO on Ctrl-C exit
 		 v1 = [0,0]
@@ -74,7 +77,7 @@ class RangeFinderPoller(threading.Thread):
 	def __init__(self):
 	 threading.Thread.__init__(self)
 	 global rangefinder #bring it in scope
-	 rangefinder = rangeFinder(1, 0x70, 23, 0)
+	 rangefinder = rangeFinder(1, 0x70, 23, 1)
 	 self.current_value = None
 	 self.running = True
 
