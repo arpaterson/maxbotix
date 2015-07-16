@@ -31,7 +31,8 @@ class rangeFinder():
 
 	def next(self):
 	 #get new range reading
-	 v1 = [-0,1]
+	 valid = 0
+	 data = [0,0]
  
 	 #wait for status pin to pull port 23 low
 	 try:
@@ -41,31 +42,38 @@ class rangeFinder():
 		 #GPIO.wait_for_edge( self.intpin, GPIO.FALLING ) #wait for it to signal ranging finished
 		 #^is causing an error
 		 #time.sleep( 1 )
-		 v1 = self.bus.read_i2c_block_data( self.deviceaddress , 0, 2 )
+		 data = self.bus.read_i2c_block_data( self.deviceaddress , 0, 2 )
 		 #^this is not always reading both bytes well.
 		 #v1[0] = self.bus.read_byte(self.deviceaddress)
 		 time.sleep(0.05)
+		 valid = 1
 		 #v1[1] = self.bus.read_byte(self.deviceaddress)
 	 	 if self.verbose > 0:
-	  	  sys.stderr.write(' highbyte = {0:b} , lowbyte = {1:b},'.format(v1[0], v1[1]) )
+	  	  sys.stderr.write(' highbyte = {0:b} , lowbyte = {1:b},'.format(data[0], data[1]) )
 	 except IOError as e:
 	         repr( e )
-		 v1 = [0,0]
+		 print "I/O error({0}): {1}".format(e.errno, e.strerror)
+		 valid = 0
+		 #need to recover I2C bus state.
+		 
+		 
+
 	 except KeyboardInterrupt as e:
 		 repr( e )
 		 #need some connection monitoring on IOError?
 		 GPIO.cleanup()	#cleanup GPIO on Ctrl-C exit
-		 v1 = [0,0]
+		 valid = 0
 
-	 if (v1[0] != -1) & (v1[1] != -1):
-		 #format highbyte
-		 highbyte = v1[0] #maxbotix sends signed 8bit int high byte
-		 highbyte = highbyte & 0x7f #drop the sign bit
-		 lowbyte = v1[1] #maxbotix sends unsigned 8bit int low byte
-
-
-	 #assemble 16bit value
-	 self.range = (highbyte<<8) + lowbyte
+	 if (valid == 1):
+	 	 #format highbyte
+		 highbyte = data[0] #maxbotix sends signed 8bit int high byte
+		 #highbyte = highbyte & 0x7f #drop the sign bit
+		 lowbyte = data[1] #maxbotix sends unsigned 8bit int low byte
+		 #assemble 16bit value
+		 self.range = (highbyte<<8) + lowbyte
+	 else:
+		 self.range = -1
+		
 
 	 #write high and low bytes out to std err for debugging
 	 if self.verbose > 0:
